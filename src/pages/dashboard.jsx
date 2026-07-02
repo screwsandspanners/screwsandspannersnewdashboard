@@ -20,7 +20,7 @@ export default function Dashboard() {
       } 
 
       try {
-        const response = await fetch("https://app.api.screwsandspanners.com/api/v1/auth/statistics", {
+        const response = await fetch("https://meemaw.sands.com.ng/api/v1/auth/statistics", {
           method: "GET", 
           headers: {
             "Authorization": `Bearer ${token}`,

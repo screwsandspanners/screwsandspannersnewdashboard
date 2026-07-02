@@ -24,14 +24,14 @@ export default function SubscriptionCard({
         </div>
 
         <div className="bg-red-50 text-red-600 font-bold text-2xl rounded-lg py-6 text-center my-6">
-          ₦{price.toLocaleString()}
+          ₦{price?.toLocaleString()}
           <p className="text-sm text-gray-500 font-normal">
-            per 1 month
+            per {description.includes("days") ? description : "1 month"}
           </p>
         </div>
 
         <ul className="space-y-3">
-          {features.map((item, index) => (
+          {features?.map((item, index) => (
             <li
               key={index}
               className="flex items-center gap-2 text-gray-600 text-sm"

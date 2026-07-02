@@ -39,8 +39,8 @@ export default function Customer() {
       const token = localStorage.getItem("authToken");
 
       const res = await fetch(
-        "https://app.api.screwsandspanners.com/api/v1/auth/customers",
-        {
+        "https://meemaw.sands.com.ng/api/v1/auth/customers",
+        { 
           method: "GET",
           headers: {
             Authorization: `Bearer ${token}`,
@@ -60,8 +60,7 @@ export default function Customer() {
 
         name: `${c.firstname || ""} ${c.lastname || ""}`.trim() || "N/A",
         email: c.email || "N/A",
-        phone: c.phone || "N/A",
-
+        phone: c.phone || "N/A",    
         jobOrders: c.completed_jobs_count ?? "N/A",
 
         subscriptionType: c.subscription?.plan?.description || "N/A",
@@ -255,6 +254,7 @@ export default function Customer() {
             <thead className="bg-gray-50">
               <tr>
                 <th className="p-3 text-left">Customer</th>
+                <th className="p-3 text-left">Phone</th>
                 <th className="p-3 text-left">JobOrders</th>
                 <th className="p-3 text-left">Subscription</th>
                 <th className="p-3 text-left">PromoType</th>
@@ -272,7 +272,7 @@ export default function Customer() {
             <tbody>
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={12} className="p-4 text-gray-500">
+                  <td colSpan={13} className="p-4 text-gray-500">
                     No records found
                   </td>
                 </tr>
@@ -284,6 +284,7 @@ export default function Customer() {
                     <div className="font-medium">{r.name}</div>
                     <div className="text-xs text-gray-500">{r.email}</div>
                   </td>
+                  <td className="p-3">{r.phone}</td>
                   <td className="p-3">{r.jobOrders}</td>
                   <td className="p-3">{r.subscriptionType}</td>
                   <td className="p-3">{r.promoType}</td>

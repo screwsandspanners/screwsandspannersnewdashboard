@@ -19,7 +19,7 @@ const LoginPage = () => {
       formData.append("device_type", "android"); // or "apple"
       formData.append("device_id", "1");         // can be any identifier
 
-      const response = await fetch("https://app.screwsandspanners.com/api/auth/login", {
+      const response = await fetch("https://meemaw.sands.com.ng/api/v1/auth/login", {
         method: "POST",
         body: formData,
       });

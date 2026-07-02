@@ -1,184 +1,326 @@
-import React, { useMemo, useState, useEffect } from 'react'
+import React, { useState, useEffect } from "react"
 
-/* Utilities */
-function formatDateISO(d) {
-  if (!d) return ''
-  const dt = new Date(d)
-  if (isNaN(dt)) return ''
-  return dt.toISOString().slice(0, 10)
+function readableTimestamp(value) {
+  if (value === undefined || value === null || value === "") return ""
+
+  const timestamp = String(value).trim()
+  const numericTimestamp = /^\d+$/.test(timestamp) ? Number(timestamp) : timestamp
+  const date = new Date(numericTimestamp)
+
+  if (isNaN(date)) return timestamp
+
+  return date.toLocaleString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  })
 }
-function humanDate(d) {
-  if (!d) return ''
-  const dt = new Date(d)
-  if (isNaN(dt)) return ''
-  return dt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
-}
+
 function downloadCSV(filename, rows) {
   if (!rows.length) return
   const headers = Object.keys(rows[0])
-  const csv = [headers.join(',')].concat(
-    rows.map(r => headers.map(h => `"${String(r[h] ?? '').replace(/"/g, '""')}"`).join(','))
-  ).join('\n')
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  const csv = [headers.join(",")].concat(
+    rows.map(r =>
+      headers.map(h => `"${String(r[h] ?? "").replace(/"/g, '""')}"`).join(",")
+    )
+  ).join("\n")
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" })
   const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
+  const a = document.createElement("a")
   a.href = url
   a.download = filename
   a.click()
   URL.revokeObjectURL(url)
 }
 
-/* Mock data (transcribed from provided table) */
-const initialStats = [
-  { sn: 2, period: '2025-05-06', category: 'Beauty', city: 'Lagos', totalSearch: 150, totalRequest: 80, totalJobOrders: 10, ratio: '8:1:4' },
-  { sn: 3, period: '2025-05-07', category: 'Fashion', city: 'Abuja', totalSearch: 200, totalRequest: 120, totalJobOrders: 16, ratio: '9:2:5' },
-  { sn: 4, period: '2025-05-08', category: 'Plumbing', city: 'Port Harcourt', totalSearch: 340, totalRequest: 100, totalJobOrders: 20, ratio: '10:3:6' },
-  { sn: 5, period: '2025-05-09', category: 'Catering', city: 'Ibadan', totalSearch: 560, totalRequest: 20, totalJobOrders: 16, ratio: '11:4:7' },
-  { sn: 6, period: '2025-05-10', category: 'Catering', city: 'Kano', totalSearch: 620, totalRequest: 50, totalJobOrders: 23, ratio: '12:5:8' },
-  { sn: 7, period: '2025-05-11', category: 'Fashion', city: 'Benin City', totalSearch: 740, totalRequest: 120, totalJobOrders: 56, ratio: '13:6:9' },
-  { sn: 8, period: '2025-05-12', category: 'Fashion', city: 'Enugu', totalSearch: 850, totalRequest: 240, totalJobOrders: 123, ratio: '14:7:10' },
-  { sn: 9, period: '2025-05-13', category: 'Fashion', city: 'Kaduna', totalSearch: 990, totalRequest: 350, totalJobOrders: 120, ratio: '15:8:11' },
-  { sn: 10, period: '2025-05-14', category: 'Fashion', city: 'Aba', totalSearch: 1200, totalRequest: 500, totalJobOrders: 320, ratio: '16:9:12' },
-  { sn: 11, period: '2025-05-15', category: 'Catering', city: 'Jos', totalSearch: 1450, totalRequest: 321, totalJobOrders: 156, ratio: '17:10:13' }
-]
+function firstValue(source, keys) {
+  for (const key of keys) {
+    if (source?.[key] !== undefined && source[key] !== null && source[key] !== "") {
+      return source[key]
+    }
+  }
 
-const categories = ['All', 'Beauty', 'Fashion', 'Plumbing', 'Catering']
-const cities = ['All', 'Lagos', 'Abuja', 'Port Harcourt', 'Ibadan', 'Kano', 'Benin City', 'Enugu', 'Kaduna', 'Aba', 'Jos']
+  return ""
+}
+
+function asList(value) {
+  if (Array.isArray(value)) return value
+  if (value === undefined || value === null || value === "") return []
+  if (typeof value === "string") {
+    return value.split(",").map(v => v.trim()).filter(Boolean)
+  }
+
+  return [value]
+}
+
+function itemName(item) {
+  const directName = firstValue(item, [
+    "ItemName",
+    "itemName",
+    "item_name",
+    "name",
+    "fullName",
+    "fullname",
+    "businessName",
+    "business_name"
+  ])
+
+  if (directName) return directName
+
+  const firstName = firstValue(item, ["firstname", "firstName", "first_name"])
+  const lastName = firstValue(item, ["lastname", "lastName", "last_name"])
+
+  return [firstName, lastName].filter(Boolean).join(" ")
+}
+
+function normalizeSelectedItems(searchRow) {
+  const selected = firstValue(searchRow, [
+    "selected_search_item",
+    "selectedSearchItem",
+    "selected_items",
+    "selectedItems",
+    "items"
+  ])
+
+  const selectedItems = Array.isArray(selected) ? selected : selected ? [selected] : []
+
+  if (selectedItems.length) {
+    return selectedItems.map(item => ({
+      id: firstValue(item, ["itemIds", "itemId", "item_id", "ItemID", "ItemId", "id", "_id"]),
+      name: itemName(item),
+      rating: firstValue(item, ["Rating", "rating", "itemRating", "ItemRating", "averageRating", "average_rating"])
+    }))
+  }
+
+  const itemIds = asList(firstValue(searchRow, ["itemIds", "item_ids", "ItemIDs", "ItemIds", "itemId", "item_id"]))
+  const itemNames = asList(firstValue(searchRow, ["ItemName", "itemName", "item_name", "itemNames", "item_names"]))
+  const ratings = asList(firstValue(searchRow, ["Rating", "rating", "ratings", "itemRatings", "item_ratings"]))
+  const maxLength = Math.max(itemIds.length, itemNames.length, ratings.length)
+
+  return Array.from({ length: maxLength }, (_, index) => ({
+    id: itemIds[index] ?? "",
+    name: itemNames[index] ?? "",
+    rating: ratings[index] ?? ""
+  }))
+}
 
 export default function SearchStatistics() {
-  const [rows, setRows] = useState(initialStats)
-  const [query, setQuery] = useState('')
-  const [categoryFilter, setCategoryFilter] = useState('All')
-  const [cityFilter, setCityFilter] = useState('All')
-  const [dateFrom, setDateFrom] = useState('')
-  const [dateTo, setDateTo] = useState('')
+  const [rows, setRows] = useState([])
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalRecords, setTotalRecords] = useState(0)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState("")
+  const [query, setQuery] = useState("")
+  const thClass = "px-3 py-2 text-left font-semibold align-top whitespace-nowrap"
+  const tdClass = "px-3 py-2 align-top whitespace-nowrap"
+  const wrapTdClass = "px-3 py-2 align-top whitespace-normal break-words max-w-[320px]"
 
-  useEffect(() => { setPage(1) }, [query, categoryFilter, cityFilter, dateFrom, dateTo])
+  const fetchSearchStats = async () => {
+    try {
+      setLoading(true)
+      const token = localStorage.getItem("authToken")
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase()
-    return rows.filter(r => {
-      if (categoryFilter !== 'All' && r.category !== categoryFilter) return false
-      if (cityFilter !== 'All' && r.city !== cityFilter) return false
-      if (dateFrom) {
-        if (new Date(r.period) < new Date(dateFrom)) return false
+      const response = await fetch(
+        `https://meemaw.sands.com.ng/api/v1/analytics/search?page=${page}&limit=${pageSize}`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json"
+          }
+        }
+      )
+
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`)
+
+      const data = await response.json()
+
+      const mapped = data.data.map((item, idx) => ({
+        sn: (page - 1) * pageSize + idx + 1,
+        id: item._id,
+        keyword: item.search_key_words,
+        categoryText: item.selected_category_text,
+        categoryId: item.selected_category_id,
+        address: item.search_address,
+        longitude: item.search_address_geo?.longitude,
+        latitude: item.search_address_geo?.latitude,
+        resultCount: item.search_result_count,
+        selectedItems: normalizeSelectedItems(item),
+        userId: item.user_unique_id,
+        timestamp: firstValue(item, ["timestamp", "Timestamp", "timeStamp", "createdAt", "created_at", "createdOn", "date", "Date", "updatedAt", "updated_at"])
+      }))
+
+      setRows(mapped)
+
+      if (data.pagination) {
+        setTotalPages(data.pagination.total_pages)
+        setTotalRecords(data.pagination.total)
       }
-      if (dateTo) {
-        const end = new Date(dateTo); end.setHours(23,59,59,999)
-        if (new Date(r.period) > end) return false
-      }
-      if (!q) return true
-      const hay = [String(r.sn), r.period, r.category, r.city, String(r.totalSearch), String(r.totalRequest), String(r.totalJobOrders), r.ratio].join(' ').toLowerCase()
-      return hay.includes(q)
-    })
-  }, [rows, query, categoryFilter, cityFilter, dateFrom, dateTo])
+    } catch (error) {
+      setError(error.message)
+    } finally {
+      setLoading(false)
+    }
+  }
 
-  const pages = Math.max(1, Math.ceil(filtered.length / pageSize))
-  const display = filtered.slice((page - 1) * pageSize, (page - 1) * pageSize + pageSize)
+  useEffect(() => {
+    fetchSearchStats()
+  }, [page, pageSize])
+
+  // SAFE GLOBAL FILTER
+  const filtered = rows.filter(r => {
+    const items = Array.isArray(r.selectedItems) ? r.selectedItems : []
+
+    const hay = [
+      r.sn, r.id, r.keyword, r.categoryText, r.categoryId,
+      r.address, r.longitude, r.latitude, r.resultCount,
+      r.userId, r.timestamp,
+      items.map(si => `${si.id} ${si.name} ${si.rating}`).join(" ")
+    ].join(" ").toLowerCase()
+
+    return hay.includes(query.trim().toLowerCase())
+  })
 
   function exportView() {
     const exportRows = filtered.map(r => ({
-      'S/N': r.sn,
-      Period: humanDate(r.period),
-      Category: r.category,
-      'City/Town': r.city,
-      'Total Search': r.totalSearch,
-      'Total Request': r.totalRequest,
-      'Total Job Orders': r.totalJobOrders,
-      'S:SR:JO': r.ratio
+      S_N: r.sn,
+      ID: r.id,
+      Keyword: r.keyword,
+      CategoryText: r.categoryText,
+      CategoryID: r.categoryId,
+      Address: r.address,
+      Longitude: r.longitude,
+      Latitude: r.latitude,
+      ResultCount: r.resultCount,
+      UserID: r.userId,
+      Timestamp: readableTimestamp(r.timestamp),
+      ItemIDs: r.selectedItems.map(si => si.id).join(", "),
+      ItemNames: r.selectedItems.map(si => si.name).join(", "),
+      ItemRatings: r.selectedItems.map(si => si.rating).join(", ")
     }))
-    downloadCSV('search-statistics.csv', exportRows)
+    downloadCSV("search-statistics.csv", exportRows)
   }
 
   return (
-    <div className="">
-      <div className="p- border-b">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold">Search Statistics</h1>
-            <p className="text-sm text-gray-500 mt-1">View and export search activity statistics</p>
-          </div>
+    <div>
+      <h2 className="text-2xl font-semibold mb-2">Search Statistics</h2>
 
-          <div className="flex items-center space-x-2">
-            <button onClick={exportView} className="bg-green-600 text-white px-3 py-2 rounded">Export Details</button>
-          </div>
-        </div>
+      <input
+        type="text"
+        placeholder="Search all fields..."
+        value={query}
+        onChange={e => setQuery(e.target.value)}
+        className="border rounded px-3 py-2 mb-4 w-1/2"
+      />
 
-        <div className="flex mt-2">
-          <input className="border rounded px-3 py-2" placeholder="Search period, category, city, numbers..." value={query} onChange={e => setQuery(e.target.value)} />
+      <button
+        onClick={exportView}
+        className="bg-green-600 text-white px-3 py-2 rounded mb-4"
+      >
+        Export to CSV
+      </button>
 
-          <div className="flex space-x-2">
-            <select className="border rounded px-3 py-2" value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)}>
-              {categories.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
+      {loading && <div>Loading...</div>}
+      {error && <div className="text-red-600">{error}</div>}
 
-            <select className="border rounded px-3 py-2" value={cityFilter} onChange={e => setCityFilter(e.target.value)}>
-              {cities.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
-          </div>
-
-          <div className="flex items-center space-x-2">
-            <input type="date" className="border rounded px-3 py-2" value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
-            <span className="text-gray-500">to</span>
-            <input type="date" className="border rounded px-3 py-2" value={dateTo} onChange={e => setDateTo(e.target.value)} />
-            <button onClick={() => { setDateFrom(''); setDateTo('') }} className="ml-2 bg-gray-100 px-3 py-2 rounded">Clear</button>
-          </div>
-        </div>
-      </div>
-
-      <div className="overflow-x-auto p-4">
-        <table className="min-w-full table-fixed">
-          <thead className="bg-gray-50 text-left">
-            <tr>
-              <th className="px-3 py-2 w-12">S/N</th>
-              <th className="px-3 py-2 w-36">Period</th>
-              <th className="px-3 py-2 w-36">Category</th>
-              <th className="px-3 py-2 w-48">City/Town</th>
-              <th className="px-3 py-2 w-36">Total Search</th>
-              <th className="px-3 py-2 w-36">Total Request</th>
-              <th className="px-3 py-2 w-40">Total Job Orders</th>
-              <th className="px-3 py-2 w-36">S:SR:JO</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            {display.length === 0 && (
-              <tr><td colSpan="8" className="px-4 py-6 text-center text-gray-500">No results found.</td></tr>
-            )}
-
-            {display.map(row => (
-              <tr key={row.sn} className="border-t">
-                <td className="px-3 py-2 w-12">{row.sn}</td>
-                <td className="px-3 py-2 w-36">{humanDate(row.period)}</td>
-                <td className="px-3 py-2 w-36">{row.category}</td>
-                <td className="px-3 py-2 w-48">{row.city}</td>
-                <td className="px-3 py-2 w-36">{row.totalSearch}</td>
-                <td className="px-3 py-2 w-36">{row.totalRequest}</td>
-                <td className="px-3 py-2 w-40">{row.totalJobOrders}</td>
-                <td className="px-3 py-2 w-36">{row.ratio}</td>
+      <div className="w-full overflow-auto">
+        <div className="max-h-[400px] overflow-y-auto">
+          <table className="w-full min-w-max border border-gray-200 text-sm table-auto">
+            <thead className="bg-gray-100">
+              <tr>
+                <th className={thClass}>S/N</th>
+                <th className={thClass}>ID</th>
+                <th className={thClass}>Keyword</th>
+                <th className={thClass}>Category Text</th>
+                <th className={thClass}>Category ID</th>
+                <th className={thClass}>Address</th>
+                <th className={thClass}>Longitude</th>
+                <th className={thClass}>Latitude</th>
+                <th className={thClass}>Result</th>
+                <th className={thClass}>User ID</th>
+                <th className={thClass}>Timestamp</th>
+                <th className={thClass}>Search Id</th>
+                <th className={thClass}>Customer's Name</th>
+                <th className={thClass}>Rating</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+
+            <tbody>
+              {filtered.length === 0 && (
+                <tr>
+                  <td colSpan="14" className="px-3 py-4 text-center text-gray-500">
+                    No results found.
+                  </td>
+                </tr>
+              )}
+
+              {filtered.map(row => {
+                const items = Array.isArray(row.selectedItems) ? row.selectedItems : []
+
+                return (
+                  <tr key={row.sn} className="border-t border-gray-200">
+                    <td className={tdClass}>{row.sn}</td>
+                    <td className={tdClass}>{row.id}</td>
+                    <td className={wrapTdClass}>{row.keyword}</td>
+                    <td className={wrapTdClass}>{row.categoryText}</td>
+                    <td className={tdClass}>{row.categoryId}</td>
+                    <td className={wrapTdClass}>{row.address}</td>
+                    <td className={tdClass}>{row.longitude}</td>
+                    <td className={tdClass}>{row.latitude}</td>
+                    <td className={tdClass}>{row.resultCount}</td>
+                    <td className={tdClass}>{row.userId}</td>
+                    <td className={tdClass}>{readableTimestamp(row.timestamp)}</td>
+                    <td className={wrapTdClass}>{items.map(si => si.id).join(", ")}</td>
+                    <td className={wrapTdClass}>{items.map(si => si.name).join(", ")}</td>
+                    <td className={tdClass}>{items.map(si => si.rating).join(", ")}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
 
-      <div className="p-4 flex items-center justify-between border-t">
-        <div className="flex items-center space-x-3">
-          <button onClick={() => setPage(p => Math.max(1, p - 1))} className="px-3 py-1 border rounded">Prev</button>
-          <div>Page {page} / {pages}</div>
-          <button onClick={() => setPage(p => Math.min(pages, p + 1))} className="px-3 py-1 border rounded">Next</button>
+      <div className="flex flex-wrap items-center justify-between gap-3 mt-4">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setPage(p => Math.max(1, p - 1))}
+            disabled={page === 1}
+            className="px-3 py-2 rounded border bg-white disabled:opacity-50"
+          >
+            Previous
+          </button>
+
+          <button
+            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+            disabled={page === totalPages}
+            className="px-3 py-2 rounded border bg-white disabled:opacity-50"
+          >
+            Next
+          </button>
         </div>
 
-        <div className="flex items-center space-x-3">
-          <div className="text-sm text-gray-600">Showing {display.length} of {filtered.length}</div>
-          <select value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(1) }} className="border rounded px-2 py-1">
-            <option value={5}>5</option>
-            <option value={10}>10</option>
-            <option value={20}>20</option>
-          </select>
-        </div>
+        <span>
+          Page {page} of {totalPages} (Total records: {totalRecords})
+        </span>
+
+        <select
+          value={pageSize}
+          onChange={e => {
+            setPageSize(Number(e.target.value))
+            setPage(1)
+          }}
+          className="border rounded px-3 py-2"
+        >
+          <option value={10}>10 / page</option>
+          <option value={25}>25 / page</option>
+          <option value={50}>50 / page</option>
+          <option value={100}>100 / page</option>
+        </select>
       </div>
     </div>
   )

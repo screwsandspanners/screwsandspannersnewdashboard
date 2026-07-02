@@ -370,7 +370,7 @@ export default function ServiceProviders() {
   // Retrieve token from localStorage
   const token = localStorage.getItem("authToken"); // adjust key name if different
 
-  fetch("https://app.api.screwsandspanners.com/api/v1/auth/sp-stats", {
+  fetch("https://meemaw.sands.com.ng/api/v1/auth/sp-stats", {
     method: "GET",
     headers: {
       "Content-Type": "application/json",
