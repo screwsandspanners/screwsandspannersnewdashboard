@@ -1,54 +1,56 @@
-import React, { ReactNode } from 'react'
-import { Routes, Route, Navigate } from 'react-router-dom'
-import { ToastContainer } from 'react-toastify'
+import { Routes, Route, Navigate, Outlet } from "react-router-dom";
+import { ToastContainer } from "react-toastify";
 
-import Layout from './components/layOut'
-import LoginPage from './pages/login/logInPage'
-import AdminPage from './pages/admin/adminPage'
-import ServiceDeliveryPage from './pages/service-delivery/serviceDeliveryPage'
-import Suppliers from './pages/supplier/suppliers'
-import Reports from './pages/reports/reports'
-import PromotionsAndSubscription from './pages/promotionsAndSubscription/promotionsAndSubscription'
-import Support from './pages/support/supportTab/support'
-import Overview from './pages/overview/overview'
+import { QueryClientProvider } from "@tanstack/react-query";
+import { queryClient } from "@/lib/react-query";
 
-interface AuthenticatedProps {
-  children: ReactNode;
+import Layout from "./components/Layout";
+import LoginPage from "./pages/login/logInPage";
+import AdminPage from "./pages/admin/adminPage";
+import ServiceDeliveryPage from "./pages/service-delivery/serviceDeliveryPage";
+import Suppliers from "./pages/supplier/suppliers";
+import Reports from "./pages/reports/reports";
+import PromotionsAndSubscription from "./pages/promotionsAndSubscription/promotionsAndSubscription";
+import Support from "./pages/support/supportTab/support";
+import Overview from "./pages/overview/overview";
+import { getAuthBio, hasToken } from "./api/auth";
+
+function Authenticated() {
+  return hasToken()
+    ? <Outlet />
+    : <Navigate to="/" replace />;
 }
 
-const Authenticated = ({ children }: AuthenticatedProps) => {
-  const token = localStorage.getItem("authToken");
-
-  if (!token) {
-    return <Navigate to="/" replace />;
-  }
-
-  return children;
-};
-
 export default function App() {
+  const bio = getAuthBio();
+
   return (
-    <>
+    <QueryClientProvider client={queryClient}>
       <Routes>
         <Route path="/" element={<LoginPage />} />
 
-        {/* Routes that show the layout */}
-        <Route element={<Layout />}>
-          <Route path="/overview" element={<Authenticated><Overview /></Authenticated>} />
-          <Route path="/admins" element={<Authenticated><AdminPage /></Authenticated>} />
-          <Route path="/service-delivery" element={<Authenticated><ServiceDeliveryPage /></Authenticated>} />
-          <Route path="/suppliers" element={<Authenticated><Suppliers /></Authenticated>} />
-          <Route path="/promotionsAndSubscriptions" element={<Authenticated><PromotionsAndSubscription /></Authenticated>} />
-          <Route path="/support" element={<Authenticated><Support /></Authenticated>} />
-          <Route path="/reports" element={<Authenticated><Reports /></Authenticated>} />
+        <Route element={<Authenticated />}>
+          <Route element={<Layout bio={bio} />}>
+            <Route path="/overview" element={<Overview />} />
+            <Route path="/admins" element={<AdminPage />} />
+            <Route path="/service-delivery" element={<ServiceDeliveryPage />} />
+            <Route path="/suppliers" element={<Suppliers />} />
+            <Route
+              path="/promotionsAndSubscriptions"
+              element={<PromotionsAndSubscription />}
+            />
+            <Route path="/support" element={<Support />} />
+            <Route path="/reports" element={<Reports />} />
+          </Route>
         </Route>
 
-        {/* fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
 
-      {/* ✅ Toast container mounted once for the whole app */}
-      <ToastContainer position="top-right" autoClose={5000} />
-    </>
-  )
+      <ToastContainer
+        position="top-right"
+        autoClose={5000}
+      />
+    </QueryClientProvider>
+  );
 }

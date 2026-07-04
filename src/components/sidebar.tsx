@@ -24,7 +24,11 @@ const menuItems = [
   { name: "Report", icon: <BarChart2 size={18} />, path: "/reports" },
 ];
 
-export default function Sidebar() {
+interface SidebarProps {
+  name: string | undefined;
+}
+
+export default function Sidebar({name}:Readonly<SidebarProps>) {
   return (
     <aside className="w-60 bg-black text-white flex flex-col rounded-2xl m-3 p-4">
       {/* Logo */}
@@ -63,8 +67,8 @@ export default function Sidebar() {
           className="w-10 h-10 rounded-full object-cover"
         />
         <div>
-          <p className="text-sm font-semibold">tmak</p>
-          <p className="text-xs text-gray-400">Super Admin</p>
+          <p className="text-sm font-semibold">{name}</p>
+          <p className="text-xs text-gray-400">Admin</p>
         </div>
       </div>
     </aside>
