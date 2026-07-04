@@ -2,7 +2,7 @@ import { useState } from "react";
 import AddPromotionModal from "./addPromotionModal";
 
 export default function PromotionsHeader() {
-  const [openModal, setOpenModal] = useState(false);
+ const [showModal, setShowModal] = useState(false);
 
   return (
     <>
@@ -15,36 +15,25 @@ export default function PromotionsHeader() {
         </div>
 
         <div className="flex flex-wrap gap-3 items-center">
-          <select className="border rounded-md px-3 py-2 text-sm">
-            <option>All Status</option>
-            <option>Active</option>
-            <option>Scheduled</option>
-          </select>
-
-          <div className="relative">
-            <input
-              type="text"
-              placeholder="Search"
-              className="border rounded-md pl-9 pr-3 py-2 text-sm"
-            />
-            <span className="absolute left-3 top-2.5 text-gray-400">
-              🔍
-            </span>
-          </div>
+         
 
           <button
-            onClick={() => setOpenModal(true)}
-            className="bg-black text-white text-sm px-4 py-2 rounded-md hover:bg-gray-800 transition"
-          >
-            + Add New Promotion
-          </button>
+        onClick={() => setShowModal(true)}
+        className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+      >
+        Add Promotion
+      </button>
         </div>
       </div>
 
       {/* Modal */}
       <AddPromotionModal
-        open={openModal}
-        onClose={() => setOpenModal(false)}
+        isOpen={showModal}
+        onClose={() => setShowModal(false)}
+        onSuccess={(newPromo) => {
+          console.log("New promo added:", newPromo);
+          // refresh your promotions grid here
+        }}
       />
     </>
   );

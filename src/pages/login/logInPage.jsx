@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import SnSlogo from '../../assets/icon/SnSlogo.png';
 import landingBackground from "../../assets/background/landingBackground.jpg";
 import { useNavigate } from "react-router-dom";
+import { api } from "../../api/authClient";
 
 const LoginPage = () => {
   const [phoneNumber, setPhoneNumber] = useState("");
@@ -11,24 +12,36 @@ const LoginPage = () => {
   const handleLogin = async (e) => {
     e.preventDefault();
     try {
+
+      const formData = {
+        "phone_code": "+234",
+        "phone_number": phoneNumber,
+        "password": password,
+        "device_type": "web",
+        "device_id": "1",
+      }
       // Build form-data for API
-      const formData = new FormData();
-      formData.append("phone_code", "+234");     // Nigeria country code
-      formData.append("phone_number", phoneNumber);
-      formData.append("password", password);
-      formData.append("device_type", "android"); // or "apple"
-      formData.append("device_id", "1");         // can be any identifier
+      // const formData = new FormData();
+      // formData.append("phone_code", "+234");     // Nigeria country code
+      // formData.append("phone_number", phoneNumber);
+      // formData.append("password", password);
+      // formData.append("device_type", "android"); // or "apple"
+      // formData.append("device_id", "1");         // can be any identifier
 
-      const response = await fetch("https://meemaw.sands.com.ng/api/v1/auth/login", {
-        method: "POST",
-        body: formData,
-      });
+      // const response = await fetch("https://meemaw.sands.com.ng/api/v1/auth/login", {
+      //   method: "POST",
+      //   body: formData,
+      // });
+
+console.log("what's up");
+
+const isLoggedIn = await api.post("/login-jsong", formData);
    
-      const data = await response.json();
+      // const data = await response.json();
 
-      if (data.token) {
+      if (isLoggedIn) {
         // Save token for authenticated requests
-        localStorage.setItem("authToken", data.token);
+        // localStorage.setItem("authToken", data.token);
         navigate("/overview"); // Redirect to overview page after successful login
       } else {
         alert("Oops! Login failed. Please check your credentials.");

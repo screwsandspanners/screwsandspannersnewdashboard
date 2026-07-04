@@ -207,7 +207,7 @@ export default function SearchStatistics() {
 
   return (
     <div>
-      <h2 className="text-2xl font-semibold mb-2">Search Statistics</h2>
+      <h2 className="text-2xl font-semibold  mb-2">Search Statistics</h2>
 
       <input
         type="text"

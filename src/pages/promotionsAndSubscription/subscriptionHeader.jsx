@@ -1,4 +1,4 @@
-export default function SubscriptionHeader() {
+export default function SubscriptionHeader({ onAdd }) {
   return (
     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
       <div>
@@ -10,7 +10,10 @@ export default function SubscriptionHeader() {
         </p>
       </div>
 
-      <button className="bg-gray-900 text-white px-5 py-2 rounded-lg hover:bg-gray-800 transition">
+      <button
+        onClick={onAdd}
+        className="bg-gray-900 text-white px-5 py-2 rounded-lg hover:bg-gray-800 transition"
+      >
         + Add New Subscription
       </button>
     </div>
