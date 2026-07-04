@@ -1,7 +1,6 @@
-import React from 'react'
+import React, { ReactNode } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { ToastContainer } from 'react-toastify'
-import 'react-toastify/dist/ReactToastify.css'
 
 import Layout from './components/layOut'
 import LoginPage from './pages/login/logInPage'
@@ -13,15 +12,17 @@ import PromotionsAndSubscription from './pages/promotionsAndSubscription/promoti
 import Support from './pages/support/supportTab/support'
 import Overview from './pages/overview/overview'
 
+interface AuthenticatedProps {
+  children: ReactNode;
+}
 
-const Authenticated = ({ children }) => {
+const Authenticated = ({ children }: AuthenticatedProps) => {
   const token = localStorage.getItem("authToken");
 
   if (!token) {
     return <Navigate to="/" replace />;
   }
-  
-  // Otherwise, render the children
+
   return children;
 };
 
