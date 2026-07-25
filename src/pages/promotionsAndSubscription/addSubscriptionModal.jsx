@@ -1,11 +1,11 @@
 import { useState } from "react";
 
-export default function AddPromotionModal({ isOpen, onClose, onSuccess }) {
+export default function AddSubscriptionModal({ isOpen, onClose, onSuccess }) {
   const [formData, setFormData] = useState({
-    type: "",
+    description: "",
+    duration: "",
     amount: "",
     effectiveDate: "",
-    description: "",
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -22,6 +22,12 @@ export default function AddPromotionModal({ isOpen, onClose, onSuccess }) {
     setError(null);
 
     try {
+      const payload = {
+        ...formData,
+        duration: String(formData.duration),
+        amount: String(formData.amount),
+        effectiveDate: new Date(formData.effectiveDate).toISOString(),
+      };
 
       const options = {
           method: "GET",
@@ -44,12 +50,12 @@ export default function AddPromotionModal({ isOpen, onClose, onSuccess }) {
       }
 
       const result = await response.json();
-      console.log("Promotion added:", result);
+      console.log("Subscription added:", result);
 
-      onSuccess?.(result); // callback to refresh promotions list
+      onSuccess?.(result); // trigger parent refresh
       onClose(); // close modal
     } catch (err) {
-      setError(`Failed to add promotion: ${err.message}`);
+      setError(`Failed to add subscription: ${err.message}`);
     } finally {
       setLoading(false);
     }
@@ -58,37 +64,52 @@ export default function AddPromotionModal({ isOpen, onClose, onSuccess }) {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg shadow-lg w-full max-w-md p-6">
-        <h2 className="text-xl font-bold mb-4">Add New Promotion</h2>
+        <h2 className="text-xl font-bold mb-4">Add New Subscription</h2>
 
         {error && <p className="text-red-500 mb-3">{error}</p>}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700">
-              Type
+              Description
             </label>
             <input
               type="text"
-              name="type"
-              value={formData.type}
+              name="description"
+              value={formData.description}
               onChange={handleChange}
               className="mt-1 block w-full border rounded-md p-2"
-              placeholder="e.g. PERCENTAGE"
+              placeholder="e.g. Weekly"
               required
             />
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700">
-              Amount
+              Duration (days)
             </label>
             <input
-              type="text"
+              type="number"
+              name="duration"
+              value={formData.duration}
+              onChange={handleChange}
+              className="mt-1 block w-full border rounded-md p-2"
+              placeholder="e.g. 7"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700">
+              Amount (₦)
+            </label>
+            <input
+              type="number"
               name="amount"
               value={formData.amount}
               onChange={handleChange}
               className="mt-1 block w-full border rounded-md p-2"
-              placeholder="e.g. 10"
+              placeholder="e.g. 1000"
               required
             />
           </div>
@@ -107,21 +128,6 @@ export default function AddPromotionModal({ isOpen, onClose, onSuccess }) {
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700">
-              Description
-            </label>
-            <input
-              type="text"
-              name="description"
-              value={formData.description}
-              onChange={handleChange}
-              className="mt-1 block w-full border rounded-md p-2"
-              placeholder="Short description"
-              required
-            />
-          </div>
-
           <div className="flex justify-end gap-3 mt-6">
             <button
               type="button"
@@ -135,7 +141,7 @@ export default function AddPromotionModal({ isOpen, onClose, onSuccess }) {
               disabled={loading}
               className="px-4 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
             >
-              {loading ? "Submitting..." : "Add Promotion"}
+              {loading ? "Submitting..." : "Add Subscription"}
             </button>
           </div>
         </form>

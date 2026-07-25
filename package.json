@@ -7,16 +7,21 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
     "@mui/material": "^7.3.5",
     "@mui/x-data-grid": "^8.18.0",
+    "@tanstack/react-query": "^5.101.2",
     "axios": "^1.13.2",
     "clsx": "^2.1.1",
     "lucide-react": "^0.552.0",
+    "nprogress": "^0.2.0",
     "prop-types": "^15.8.1",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
@@ -26,8 +31,10 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.36.0",
-    "@types/react": "^19.1.16",
-    "@types/react-dom": "^19.1.9",
+    "@types/node": "^26.1.0",
+    "@types/nprogress": "^0.2.3",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.0.4",
     "autoprefixer": "^10.4.21",
     "baseline-browser-mapping": "^2.9.19",
@@ -37,6 +44,7 @@
     "globals": "^16.4.0",
     "postcss": "^8.5.6",
     "tailwindcss": "^3.4.18",
+    "typescript": "^6.0.3",
     "vite": "^7.1.7"
   }
 }
