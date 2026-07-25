@@ -16,7 +16,7 @@ export default function PromotionsGrid() {
         };
 
         const response = await fetch(
-          "https://subscriptions.sands.com.ng/api/v1/promo/?status=active",
+          "https://subscriptions.sands.com.ng/api/v1/promo/?limit=20&status=active",
           options,
         );
 

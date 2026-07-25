@@ -1,54 +1,43 @@
 import { useState } from "react";
+import { api_subscription } from "@/api/client_subscription";
+import { PROMO_PATH } from "@/constants";
+import { AddPromo } from "@/types/api";
 
-export default function AddPromotionModal({ isOpen, onClose, onSuccess }) {
-  const [formData, setFormData] = useState({
-    type: "",
-    amount: "",
-    effectiveDate: "",
-    description: "",
-  });
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+interface HeaderProps {
+  isOpen: boolean;
+  onClose: Function;
+  onSuccess: Function
+}
+
+export default function AddPromotionModal({isOpen, onClose, onSuccess}:Readonly<HeaderProps>) {
+  interface AddPromoType{
+    status: string;
+    type: string;
+    amount: string;
+    effectiveDate: string;
+    description: string;
+  }
+
+  const [formData, setFormData] = useState<AddPromoType>({status:"active", type:"", amount:"", effectiveDate:"", description:""});
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string|null>(null);
 
   if (!isOpen) return null;
 
-  const handleChange = (e) => {
+  const handleChange = (e:any) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e:any) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
 
     try {
-
-      const options = {
-          method: "GET",
-          headers: {
-            x_api_key: "a4261bd2-e678-4552-a432-ab16431b6249",
-          },
-        };
-
-      const response = await fetch(
-        "https://subscriptions.sands.com.ng/api/v1/promo/?status=active",options,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(formData),
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! Status: ${response.status}`);
-      }
-
-      const result = await response.json();
-      console.log("Promotion added:", result);
-
-      onSuccess?.(result); // callback to refresh promotions list
-      onClose(); // close modal
-    } catch (err) {
+      const response = await api_subscription.post<AddPromo>(PROMO_PATH, formData);
+      onSuccess(response);
+      onClose();
+    } catch (err:any) {
       setError(`Failed to add promotion: ${err.message}`);
     } finally {
       setLoading(false);
@@ -64,13 +53,13 @@ export default function AddPromotionModal({ isOpen, onClose, onSuccess }) {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700">
+            <output className="block text-sm font-medium text-gray-700">
               Type
-            </label>
+            </output>
             <input
               type="text"
               name="type"
-              value={formData.type}
+              value={formData?.type}
               onChange={handleChange}
               className="mt-1 block w-full border rounded-md p-2"
               placeholder="e.g. PERCENTAGE"
@@ -79,13 +68,13 @@ export default function AddPromotionModal({ isOpen, onClose, onSuccess }) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700">
+            <output className="block text-sm font-medium text-gray-700">
               Amount
-            </label>
+            </output>
             <input
               type="text"
               name="amount"
-              value={formData.amount}
+              value={formData?.amount}
               onChange={handleChange}
               className="mt-1 block w-full border rounded-md p-2"
               placeholder="e.g. 10"
@@ -94,13 +83,13 @@ export default function AddPromotionModal({ isOpen, onClose, onSuccess }) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700">
+            <output className="block text-sm font-medium text-gray-700">
               Effective Date
-            </label>
+            </output>
             <input
               type="date"
               name="effectiveDate"
-              value={formData.effectiveDate}
+              value={formData?.effectiveDate}
               onChange={handleChange}
               className="mt-1 block w-full border rounded-md p-2"
               required
@@ -108,13 +97,13 @@ export default function AddPromotionModal({ isOpen, onClose, onSuccess }) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700">
+            <output className="block text-sm font-medium text-gray-700">
               Description
-            </label>
+            </output>
             <input
               type="text"
               name="description"
-              value={formData.description}
+              value={formData?.description}
               onChange={handleChange}
               className="mt-1 block w-full border rounded-md p-2"
               placeholder="Short description"
@@ -125,7 +114,7 @@ export default function AddPromotionModal({ isOpen, onClose, onSuccess }) {
           <div className="flex justify-end gap-3 mt-6">
             <button
               type="button"
-              onClick={onClose}
+              // onClick={onClose}
               className="px-4 py-2 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-100"
             >
               Cancel
