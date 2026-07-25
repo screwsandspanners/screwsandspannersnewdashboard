@@ -14,6 +14,7 @@ export default defineConfig({
   server: {
     allowedHosts: [
       'cube-refute-spray.ngrok-free.dev',
+      'pro-master-jennet.ngrok-free.app'
     ]
   }
 })

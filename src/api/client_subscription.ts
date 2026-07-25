@@ -3,7 +3,6 @@ import axios, {
     AxiosRequestConfig,
     AxiosResponse,
   } from "axios";
-  import { getToken, setToken, clearToken, setAuthBio } from "./auth";
   import NProgress from "nprogress";
 
   NProgress.configure({
@@ -14,23 +13,18 @@ import axios, {
   });
 
   export const apiClient = axios.create({
-    baseURL: import.meta.env.VITE_MEEMAW_API_BASE_URL,
+    baseURL: import.meta.env.VITE_SUBSCRIPTION_API_BASE_URL,
     timeout: 30000,
   });
   
   /**
    * Request Interceptor
-   * Automatically attach the JWT token
+   * Automatically attach the x_api_key
    */
   apiClient.interceptors.request.use(
     (config) => {
-        NProgress.start();
-      const token = getToken();
-  
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-      }
-  
+        NProgress.start();  
+        config.headers.x_api_key = import.meta.env.VITE_SUBSCRIPTION_SERVICE_X_API_KEY;  
       return config;
     },
     (error: Error) => Promise.reject(error)
@@ -41,23 +35,10 @@ import axios, {
    */
   apiClient.interceptors.response.use(
     (response: AxiosResponse) => {
-      // Save token if backend returns one (e.g. login)
-      if (response.data?.token) {
-        setToken(response.data.token);
-        setAuthBio(response.data.user_data);
-      }
-
       NProgress.done();
-      return response;
+      return response.data;
     },
-    (error: AxiosError) => {
-      if (error.response?.status === 401) {
-        clearToken();
-  
-        // Optional: redirect to login
-        window.location.href = "/";
-      }
-  
+    (error: AxiosError) => {  
       NProgress.done();
       return Promise.reject(error);
     }
@@ -70,7 +51,7 @@ import axios, {
     return response.data;
   }
   
-  export const api = {
+  export const api_subscription = {
     get<T = any>(url: string, config?: AxiosRequestConfig) {
       return request<T>({
         url,
