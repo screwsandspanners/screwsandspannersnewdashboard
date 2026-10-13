@@ -1,5 +1,8 @@
 import { useState } from "react";
 
+const SUBSCRIPTION_API_BASE_URL = "/subscription-api";
+const SUBSCRIPTION_API_KEY = import.meta.env.VITE_SUBSCRIPTION_SERVICE_X_API_KEY;
+
 export default function AddSubscriptionModal({ isOpen, onClose, onSuccess }) {
   const [formData, setFormData] = useState({
     description: "",
@@ -29,19 +32,15 @@ export default function AddSubscriptionModal({ isOpen, onClose, onSuccess }) {
         effectiveDate: new Date(formData.effectiveDate).toISOString(),
       };
 
-      const options = {
-          method: "GET",
-          headers: {
-            x_api_key: "a4261bd2-e678-4552-a432-ab16431b6249",
-          },
-        };
-
       const response = await fetch(
-        "https://subscriptions.sands.com.ng/api/v1/promo/?status=active",options,
+        `${SUBSCRIPTION_API_BASE_URL}/subscription/`,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(formData),
+          headers: {
+            "Content-Type": "application/json",
+            x_api_key: SUBSCRIPTION_API_KEY,
+          },
+          body: JSON.stringify(payload),
         }
       );
 

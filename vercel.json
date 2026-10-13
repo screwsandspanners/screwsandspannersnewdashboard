@@ -1,5 +1,9 @@
 {
   "rewrites": [
+    {
+      "source": "/subscription-api/:path*",
+      "destination": "https://subscriptions.sands.com.ng/api/v1/:path*"
+    },
     { "source": "/(.*)", "destination": "/" }
   ]
 }

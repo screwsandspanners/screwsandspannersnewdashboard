@@ -30,6 +30,13 @@ import axios, {
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
       }
+
+      console.log("API Request:", {
+        url: config.url,
+        method: config.method?.toUpperCase(),
+        headers: config.headers,
+        data: config.data,
+      });
   
       return config;
     },
@@ -47,10 +54,24 @@ import axios, {
         setAuthBio(response.data.user_data);
       }
 
+      console.log("API Response:", {
+        url: response.config.url,
+        status: response.status,
+        data: response.data,
+      });
+
       NProgress.done();
       return response;
     },
     (error: AxiosError) => {
+      console.error("API Error:", {
+        url: error.config?.url,
+        method: error.config?.method?.toUpperCase(),
+        status: error.response?.status,
+        data: error.response?.data,
+        message: error.message,
+      });
+
       if (error.response?.status === 401) {
         clearToken();
   

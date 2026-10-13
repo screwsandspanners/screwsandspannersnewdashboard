@@ -58,49 +58,71 @@ export default function ServiceProviders() {
   //EXPORT FUNCTIONS
 
   function exportCSVsheet(dataToExport) {
-    const header =
-      "id,name,email,businessName,categories,phone,city,accountStatus,completedOrders,verification,createdAt\n";
+    const headers = [
+      "id",
+      "firstName",
+      "lastName",
+      "fullName",
+      "email",
+      "createdAt",
+      "businessName",
+      "categories",
+      "phone",
+      "address",
+      "city",
+      "jobTaken",
+      "completedJobs",
+      "verification",
+      "badgeEnabled",
+      "badgeStart",
+      "badgeEnd",
+    ];
 
     const lines = dataToExport.map((r) => {
-      const name = `${r.firstname || ""} ${r.lastname || ""}`.trim();
-      const businessName = r.business?.business_name || "";
-      const categories = Array.isArray(r.categories)
-        ? r.categories.map((c) => c.title).join("; ")
-        : "";
-      const phone = r.phone || "";
-      const city = r.city || "";
-      const status = r.accountStatus || "";
-      const completed = r.completedOrders ?? r.completed_jobs_count ?? "";
-      const verification = r.verification ?? r.business?.verified ?? "";
-      const createdAt = r.created_at || "";
-
-      const safe = (val) =>
-        typeof val === "string" && val.includes(",") ? `"${val}"` : val;
+      const safe = (value) => {
+        const stringValue = value == null ? "" : String(value);
+        return /[",\r\n]/.test(stringValue)
+          ? `"${stringValue.replace(/"/g, '""')}"`
+          : stringValue;
+      };
 
       return [
         r.id,
-        safe(name),
+        safe(r.firstname),
+        safe(r.lastname),
+        safe(r.fullName || `${r.firstname || ""} ${r.lastname || ""}`.trim()),
         safe(r.email || ""),
-        safe(businessName),
-        safe(categories),
-        safe(phone),
-        safe(city),
-        safe(status),
-        completed,
-        verification,
-        createdAt,
+        safe(r.created_at),
+        safe(r.business_name || r.business?.business_name),
+        safe(
+          r.categories_titles ||
+            (Array.isArray(r.categories)
+              ? r.categories.map((category) => category.title).join("; ")
+              : "")
+        ),
+        safe(r.phone),
+        safe(r.address || r.business?.business_address),
+        safe(r.city),
+        safe(r.job_taken ?? r.business?.job_taken),
+        safe(r.completed_jobs ?? r.business?.job_completed),
+        safe(r.verification ?? r.business?.verified),
+        safe(r.badgeEnabled),
+        safe(r.badgeStart),
+        safe(r.badgeEnd),
       ].join(",");
     });
 
-    const csvContent = header + lines.join("\n");
+    const csvContent = `${headers.join(",")}\n${lines.join("\n")}`;
     const blob = new Blob([csvContent], {
       type: "text/csv;charset=utf-8;",
     });
 
     const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
+    const url = URL.createObjectURL(blob);
+    link.href = url;
     link.download = "service_providers.csv";
     link.click();
+    URL.revokeObjectURL(url);
   }
 
   //DATAGRID COLUMNS
@@ -438,7 +460,7 @@ export default function ServiceProviders() {
         {/* EXPORT BUTTONS */}
         <button
           onClick={() =>
-            exportCSVsheet(filteredRows.length ? filteredRows : rows)
+            exportCSVsheet(filteredRows)
           }
           className="px-4 py-2 bg-indigo-600 text-white rounded"
         >

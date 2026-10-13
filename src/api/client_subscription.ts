@@ -25,6 +25,14 @@ import axios, {
     (config) => {
         NProgress.start();  
         config.headers.x_api_key = import.meta.env.VITE_SUBSCRIPTION_SERVICE_X_API_KEY;  
+
+        console.log("Subscription API Request:", {
+          url: config.url,
+          method: config.method?.toUpperCase(),
+          headers: config.headers,
+          data: config.data,
+        });
+
       return config;
     },
     (error: Error) => Promise.reject(error)
@@ -35,10 +43,22 @@ import axios, {
    */
   apiClient.interceptors.response.use(
     (response: AxiosResponse) => {
+      console.log("Subscription API Response:", {
+        url: response.config.url,
+        status: response.status,
+        data: response.data,
+      });
       NProgress.done();
       return response.data;
     },
     (error: AxiosError) => {  
+      console.error("Subscription API Error:", {
+        url: error.config?.url,
+        method: error.config?.method?.toUpperCase(),
+        status: error.response?.status,
+        data: error.response?.data,
+        message: error.message,
+      });
       NProgress.done();
       return Promise.reject(error);
     }
