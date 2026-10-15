@@ -471,6 +471,111 @@ const getTradeNames = (user) => {
     .filter(Boolean);
 };
 
+/* =========================================================
+   ADDRESSES
+   The API sends the addresses as an ARRAY (addressInfo).
+   This pulls out every address, not only the first one.
+========================================================= */
+
+const getAddresses = (user) => {
+  const source =
+    user?.user_address ??
+    user?.addressInfo ??
+    user?.address_info ??
+    user?.addresses ??
+    user?.address;
+
+  const list = Array.isArray(source) ? source : source ? [source] : [];
+
+  return list
+    .map((item) => {
+      if (typeof item === "string") {
+        return {
+          address: item.trim(),
+          area: "",
+          landmark: "",
+          state: "",
+          lga: "",
+          latitude: null,
+          longitude: null,
+        };
+      }
+
+      if (!item || typeof item !== "object") {
+        return null;
+      }
+
+      return {
+        address: String(item?.address || item?.full_address || item?.street || "").trim(),
+        area: item?.area || "",
+        landmark: item?.landmark || "",
+        state: item?.state || "",
+        lga: item?.lga || "",
+        latitude: item?.latitude ?? item?.lat ?? null,
+        longitude: item?.longitude ?? item?.lng ?? null,
+      };
+    })
+    .filter((item) => item && item.address);
+};
+
+/* One line per address: "address, area, lga, state" */
+const formatAddress = (item) =>
+  [item?.address, item?.area, item?.lga, item?.state].filter(Boolean).join(", ");
+
+/* All values of one address field, joined (used for sorting and CSV export) */
+const joinAddressField = (row, key) =>
+  (Array.isArray(row?.addressList) ? row.addressList : [])
+    .map((item) => item?.[key])
+    .filter(Boolean)
+    .join(" | ") || "N/A";
+
+/* One table column for one address field.
+   A user with several addresses shows one line per address. */
+const makeAddressColumn = (field, headerName, width, key) => ({
+  field,
+  headerName,
+  width,
+  sortable: true,
+  filterable: true,
+
+  valueGetter: (value, row) => joinAddressField(row, key),
+
+  renderCell: (params) => {
+    const list = Array.isArray(params?.row?.addressList) ? params.row.addressList : [];
+
+    if (!list.length) {
+      return "N/A";
+    }
+
+    return (
+      <Box
+        sx={{
+          width: "100%",
+          maxHeight: 60,
+          overflowY: "auto",
+          py: 0.5,
+          lineHeight: 1.3,
+        }}
+      >
+        {list.map((item, index) => (
+          <Typography key={`${field}-${index}`} sx={{ fontSize: 13 }}>
+            {list.length > 1 ? `${index + 1}. ` : ""}
+            {item?.[key] || "N/A"}
+          </Typography>
+        ))}
+      </Box>
+    );
+  },
+});
+
+const addressColumns = [
+  makeAddressColumn("userAddress", "Address", 260, "address"),
+  makeAddressColumn("userArea", "Area", 160, "area"),
+  makeAddressColumn("userLandmark", "Landmark", 180, "landmark"),
+  makeAddressColumn("userLga", "LGA", 150, "lga"),
+  makeAddressColumn("userState", "State", 150, "state"),
+];
+
 const mapUserToRow = (user, index) => {
   const subscription = getSubscription(user);
 
@@ -574,6 +679,15 @@ const mapUserToRow = (user, index) => {
      * Status
      */
     subscriptionStatus,
+
+    /*
+     * ADDRESSES (all of them)
+     */
+    addressList: getAddresses(user),
+    addressDisplay:
+      getAddresses(user)
+        .map((item) => formatAddress(item))
+        .join(" | ") || "N/A",
 
     /*
      * SP BADGE
@@ -1018,6 +1132,11 @@ export default function Customer() {
       "Business Email",
       "Business Phone",
       "Business Address",
+      "Address",
+      "Area",
+      "Landmark",
+      "LGA",
+      "State",
       "Subscription",
       "Signup Date",
       "Valid From",
@@ -1058,6 +1177,11 @@ export default function Customer() {
           escapeCsv(row?.business?.business_email || "N/A"),
           escapeCsv(row?.business?.business_phone || "N/A"),
           escapeCsv(row?.business?.business_address || "N/A"),
+          escapeCsv(joinAddressField(row, "address")),
+          escapeCsv(joinAddressField(row, "area")),
+          escapeCsv(joinAddressField(row, "landmark")),
+          escapeCsv(joinAddressField(row, "lga")),
+          escapeCsv(joinAddressField(row, "state")),
           escapeCsv(row?.subscription ? `Subscribed ${row?.subscriptionType || ""}` : "No Subscription"),
           escapeCsv(row?.signupDate || "N/A"),
           escapeCsv(row?.validFrom || "N/A"),
@@ -1688,18 +1812,10 @@ export default function Customer() {
       },
 
       /* ===================================================
-         ADDRESS
+         ADDRESS (one column per field: address, area, landmark, LGA, state)
       =================================================== */
 
-      {
-        field: "address",
-        headerName: "Address",
-        width: 240,
-        sortable: true,
-        filterable: true,
-
-        valueGetter: (value, row) => row?.addressInfo?.[0]?.address || "N/A",
-      },
+      ...addressColumns,
 
       /* ===================================================
          ACTIONS
@@ -2351,11 +2467,36 @@ export default function Customer() {
 
                 {/* ADDRESS */}
 
-                <Detail label="Address" value={selectedUser?.addressInfo?.[0]?.address} />
+                {selectedUser?.addressList?.length ? (
+                  selectedUser.addressList.map((item, index) => {
+                    const suffix =
+                      selectedUser.addressList.length > 1 ? ` ${index + 1}` : "";
 
-                <Detail label="Latitude" value={selectedUser?.addressInfo?.[0]?.latitude} />
+                    return (
+                      <React.Fragment key={`${item.address}-${index}`}>
+                        <Detail label={`Address${suffix}`} value={item.address} />
 
-                <Detail label="Longitude" value={selectedUser?.addressInfo?.[0]?.longitude} />
+                        <Detail label={`Area${suffix}`} value={item.area} />
+
+                        <Detail label={`Landmark${suffix}`} value={item.landmark} />
+
+                        <Detail label={`LGA${suffix}`} value={item.lga} />
+
+                        <Detail label={`State${suffix}`} value={item.state} />
+
+                        {item.latitude !== null && item.latitude !== undefined && (
+                          <Detail label={`Latitude${suffix}`} value={item.latitude} />
+                        )}
+
+                        {item.longitude !== null && item.longitude !== undefined && (
+                          <Detail label={`Longitude${suffix}`} value={item.longitude} />
+                        )}
+                      </React.Fragment>
+                    );
+                  })
+                ) : (
+                  <Detail label="Address" value="N/A" />
+                )}
               </Box>
             </Box>
           )}
