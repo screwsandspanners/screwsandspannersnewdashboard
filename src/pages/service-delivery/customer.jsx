@@ -5,7 +5,6 @@ import {
   GridToolbarColumnsButton,
   GridToolbarFilterButton,
   GridToolbarDensitySelector,
-  GridToolbarExport,
 } from "@mui/x-data-grid";
 
 import {
@@ -28,6 +27,9 @@ import {
 
 import { Search, X, RefreshCw, Eye } from "lucide-react";
 
+// SP BADGE (new file: spBadge.jsx, same folder as this file)
+import { useSpBadge, SpBadgeToolbar, SpBadgeDialogs, isSP, isBadged } from "./spBadge";
+
 /* =========================================================
    API CONFIGURATION
 ========================================================= */
@@ -35,6 +37,8 @@ import { Search, X, RefreshCw, Eye } from "lucide-react";
 const API_URL = "https://meemaw.sands.com.ng/api/v1/admin/all-users";
 
 const API_BASE_URL = "https://meemaw.sands.com.ng";
+
+
 
 /* =========================================================
    AUTH TOKEN
@@ -439,8 +443,143 @@ const getSubscriptionStatus = (subscription) => {
    MAP API USER TO DATAGRID ROW
 ========================================================= */
 
+const getTradeNames = (user) => {
+  if (!Array.isArray(user?.trades)) {
+    return [];
+  }
+
+  return user.trades
+    .map((trade) => {
+      if (typeof trade === "string") {
+        return trade.trim();
+      }
+
+      if (!trade || typeof trade !== "object") {
+        return "";
+      }
+
+      return (
+        trade?.name ||
+        trade?.trade_name ||
+        trade?.tradeName ||
+        trade?.title ||
+        trade?.label ||
+        trade?.value ||
+        ""
+      );
+    })
+    .filter(Boolean);
+};
+
+/* =========================================================
+   ADDRESSES
+   The API sends the addresses as an ARRAY (addressInfo).
+   This pulls out every address, not only the first one.
+========================================================= */
+
+const getAddresses = (user) => {
+  const source =
+    user?.user_address ??
+    user?.addressInfo ??
+    user?.address_info ??
+    user?.addresses ??
+    user?.address;
+
+  const list = Array.isArray(source) ? source : source ? [source] : [];
+
+  return list
+    .map((item) => {
+      if (typeof item === "string") {
+        return {
+          address: item.trim(),
+          area: "",
+          landmark: "",
+          state: "",
+          lga: "",
+          latitude: null,
+          longitude: null,
+        };
+      }
+
+      if (!item || typeof item !== "object") {
+        return null;
+      }
+
+      return {
+        address: String(item?.address || item?.full_address || item?.street || "").trim(),
+        area: item?.area || "",
+        landmark: item?.landmark || "",
+        state: item?.state || "",
+        lga: item?.lga || "",
+        latitude: item?.latitude ?? item?.lat ?? null,
+        longitude: item?.longitude ?? item?.lng ?? null,
+      };
+    })
+    .filter((item) => item && item.address);
+};
+
+/* One line per address: "address, area, lga, state" */
+const formatAddress = (item) =>
+  [item?.address, item?.area, item?.lga, item?.state].filter(Boolean).join(", ");
+
+/* All values of one address field, joined (used for sorting and CSV export) */
+const joinAddressField = (row, key) =>
+  (Array.isArray(row?.addressList) ? row.addressList : [])
+    .map((item) => item?.[key])
+    .filter(Boolean)
+    .join(" | ") || "N/A";
+
+/* One table column for one address field.
+   A user with several addresses shows one line per address. */
+const makeAddressColumn = (field, headerName, width, key) => ({
+  field,
+  headerName,
+  width,
+  sortable: true,
+  filterable: true,
+
+  valueGetter: (value, row) => joinAddressField(row, key),
+
+  renderCell: (params) => {
+    const list = Array.isArray(params?.row?.addressList) ? params.row.addressList : [];
+
+    if (!list.length) {
+      return "N/A";
+    }
+
+    return (
+      <Box
+        sx={{
+          width: "100%",
+          maxHeight: 60,
+          overflowY: "auto",
+          py: 0.5,
+          lineHeight: 1.3,
+        }}
+      >
+        {list.map((item, index) => (
+          <Typography key={`${field}-${index}`} sx={{ fontSize: 13 }}>
+            {list.length > 1 ? `${index + 1}. ` : ""}
+            {item?.[key] || "N/A"}
+          </Typography>
+        ))}
+      </Box>
+    );
+  },
+});
+
+const addressColumns = [
+  makeAddressColumn("userAddress", "Address", 260, "address"),
+  makeAddressColumn("userArea", "Area", 160, "area"),
+  makeAddressColumn("userLandmark", "Landmark", 180, "landmark"),
+  makeAddressColumn("userLga", "LGA", 150, "lga"),
+  makeAddressColumn("userState", "State", 150, "state"),
+];
+
 const mapUserToRow = (user, index) => {
   const subscription = getSubscription(user);
+
+  const tradeNames = getTradeNames(user);
 
   /*
    * First try to find transaction
@@ -504,6 +643,12 @@ const mapUserToRow = (user, index) => {
     name: getUserName(user),
 
     /*
+     * Trades
+     */
+    trades: tradeNames,
+    tradeDisplay: tradeNames.join(", ") || "N/A",
+
+    /*
      * Dates
      */
     signupDate,
@@ -534,6 +679,22 @@ const mapUserToRow = (user, index) => {
      * Status
      */
     subscriptionStatus,
+
+    /*
+     * ADDRESSES (all of them)
+     */
+    addressList: getAddresses(user),
+    addressDisplay:
+      getAddresses(user)
+        .map((item) => formatAddress(item))
+        .join(" | ") || "N/A",
+
+    /*
+     * SP BADGE
+     * "1" = badged, "0" = not badged
+     * (comes from business.badge)
+     */
+    badge: String(user?.business?.badge ?? "0"),
 
     /*
      * Keep complete original
@@ -631,7 +792,7 @@ const getTotalPages = (json, pagination, usersLength, pageSize) => {
    DATAGRID TOOLBAR
 ========================================================= */
 
-function CustomToolbar() {
+function CustomToolbar({ onExportAll, onExportFiltered }) {
   return (
     <GridToolbarContainer
       sx={{
@@ -646,7 +807,13 @@ function CustomToolbar() {
 
       <GridToolbarDensitySelector />
 
-      <GridToolbarExport />
+      <Button variant="outlined" size="small" onClick={onExportAll}>
+        Export All
+      </Button>
+
+      <Button variant="contained" size="small" onClick={onExportFiltered}>
+        Export Filtered
+      </Button>
     </GridToolbarContainer>
   );
 }
@@ -751,6 +918,8 @@ export default function Customer() {
           },
         });
 
+        console.log(`Users API response page ${page}:`, response);
+
         const json = await response.json();
 
         console.log(`Users API page ${page}:`, json);
@@ -816,6 +985,21 @@ export default function Customer() {
 
       console.log("TOTAL USERS:", mappedUsers.length);
 
+      /*
+       * SP BADGE CHECK
+       * Look at these in the console to confirm:
+       * 1) what "type" looks like for SPs
+       * 2) that business.badge is coming from the API
+       */
+      console.log(
+        "USER TYPES FOUND:",
+        [...new Set(mappedUsers.map((u) => u?.type))],
+      );
+      console.log(
+        "FIRST SP (check business.badge):",
+        mappedUsers.find((u) => isSP(u)),
+      );
+
       setAllUsers(mappedUsers);
     } catch (err) {
       console.error("Failed to load users:", err);
@@ -835,6 +1019,13 @@ export default function Customer() {
   }, []);
 
   /* =======================================================
+     SP BADGE (switch, filter, bulk, CSV import)
+     Must stay after fetchAllUsers and before filteredUsers.
+  ======================================================= */
+
+  const badge = useSpBadge(setAllUsers, fetchAllUsers, allUsers);
+
+  /* =======================================================
      FILTER ALL USERS
 
      IMPORTANT:
@@ -847,6 +1038,8 @@ export default function Customer() {
      NAME FILTER
           ↓
      SUBSCRIPTION FILTER
+          ↓
+     SP BADGE FILTER
           ↓
      DATAGRID
           ↓
@@ -894,8 +1087,15 @@ export default function Customer() {
       );
     }
 
+    /* ---------------------------------------------------
+         SP BADGE FILTER
+         All users / All SP / Badged SP / Non-badged SP
+      --------------------------------------------------- */
+
+    result = badge.applyFilter(result);
+
     return result;
-  }, [allUsers, search, subscriptionFilter]);
+  }, [allUsers, search, subscriptionFilter, badge.applyFilter]);
 
   /* =======================================================
      SEARCH
@@ -913,6 +1113,111 @@ export default function Customer() {
     setSearchInput("");
     setSearch("");
     setSubscriptionFilter("all");
+    badge.setFilter("all");
+  };
+
+  /* =======================================================
+     EXPORT CSV
+  ======================================================= */
+
+  const exportCsv = (rows, filename) => {
+    const headers = [
+      "ID",
+      "Name",
+      "Email",
+      "Phone",
+      "Type",
+      "Trade",
+      "Business",
+      "Business Email",
+      "Business Phone",
+      "Business Address",
+      "Address",
+      "Area",
+      "Landmark",
+      "LGA",
+      "State",
+      "Subscription",
+      "Signup Date",
+      "Valid From",
+      "Valid To",
+      "Amount Paid",
+      "Base Amount",
+      "Subscription Status",
+      "Account Status",
+      "Business Verified",
+      "SP Badge",
+    ];
+
+    const escapeCsv = (value) => {
+      const text = value === null || value === undefined ? "" : String(value);
+
+      if (text.includes(",") || text.includes('"') || text.includes("\n")) {
+        return `"${text.replace(/"/g, '""')}"`;
+      }
+
+      return text;
+    };
+
+    const csvRows = [
+      headers.join(","),
+      ...rows.map((row) => {
+        const tradeValue = Array.isArray(row?.trades) ? row.trades.join("; ") : row?.tradeDisplay || "N/A";
+
+        const values = [
+          escapeCsv(row?.id || "N/A"),
+          escapeCsv(getUserName(row)),
+          escapeCsv(row?.email || "N/A"),
+          escapeCsv(
+            row?.phone ? `${row?.phone_code || ""} ${row.phone}`.trim() : "N/A",
+          ),
+          escapeCsv(row?.type || "N/A"),
+          escapeCsv(tradeValue || "N/A"),
+          escapeCsv(row?.business?.business_name || "N/A"),
+          escapeCsv(row?.business?.business_email || "N/A"),
+          escapeCsv(row?.business?.business_phone || "N/A"),
+          escapeCsv(row?.business?.business_address || "N/A"),
+          escapeCsv(joinAddressField(row, "address")),
+          escapeCsv(joinAddressField(row, "area")),
+          escapeCsv(joinAddressField(row, "landmark")),
+          escapeCsv(joinAddressField(row, "lga")),
+          escapeCsv(joinAddressField(row, "state")),
+          escapeCsv(row?.subscription ? `Subscribed ${row?.subscriptionType || ""}` : "No Subscription"),
+          escapeCsv(row?.signupDate || "N/A"),
+          escapeCsv(row?.validFrom || "N/A"),
+          escapeCsv(row?.validTo || "N/A"),
+          escapeCsv(row?.amountPaid || "N/A"),
+          escapeCsv(row?.baseAmount || "N/A"),
+          escapeCsv(row?.subscriptionStatus || "N/A"),
+          escapeCsv(Number(row?.active) === 1 ? "Active" : "Inactive"),
+          escapeCsv(Number(row?.business?.verified) === 1 ? "Verified" : "Not Verified"),
+          escapeCsv(isSP(row) ? (isBadged(row) ? "Badged" : "Not Badged") : "N/A"),
+        ];
+
+        return values.join(",");
+      }),
+    ];
+
+    const blob = new Blob([csvRows.join("\n")], {
+      type: "text/csv;charset=utf-8;",
+    });
+
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+
+    link.href = url;
+    link.download = filename;
+    link.click();
+
+    URL.revokeObjectURL(url);
+  };
+
+  const handleExportAll = () => {
+    exportCsv(allUsers, "all-users.csv");
+  };
+
+  const handleExportFiltered = () => {
+    exportCsv(filteredUsers, "filtered-users.csv");
   };
 
   /* =======================================================
@@ -930,6 +1235,18 @@ export default function Customer() {
 
   const columns = useMemo(
     () => [
+      /* ===================================================
+         ID
+      =================================================== */
+
+      {
+        field: "id",
+        headerName: "ID",
+        width: 120,
+        sortable: true,
+        filterable: true,
+      },
+
       /* ===================================================
          USER
       =================================================== */
@@ -1001,6 +1318,12 @@ export default function Customer() {
       },
 
       /* ===================================================
+         SP BADGE (icon + on/off switch, SP users only)
+      =================================================== */
+
+      ...badge.columns,
+
+      /* ===================================================
          UNIQUE ID
       =================================================== */
 
@@ -1034,6 +1357,59 @@ export default function Customer() {
             }}
           />
         ),
+      },
+
+      /* ===================================================
+         TRADES
+      =================================================== */
+
+      {
+        field: "tradeDisplay",
+        headerName: "Trade",
+        width: 320,
+        sortable: true,
+        filterable: true,
+
+        valueGetter: (value, row) => row?.tradeDisplay || "N/A",
+
+        renderCell: (params) => {
+          const trades = Array.isArray(params?.row?.trades) ? params.row.trades : [];
+
+          if (!trades.length) {
+            return "N/A";
+          }
+
+          return (
+            <Box
+              sx={{
+                display: "flex",
+                flexWrap: "wrap",
+                gap: 0.5,
+                alignItems: "center",
+                width: "100%",
+                maxHeight: 72,
+                overflowY: "auto",
+                py: 0.5,
+                pr: 0.5,
+                boxSizing: "border-box",
+              }}
+            >
+              {trades.map((trade, index) => (
+                <Chip
+                  key={`${trade}-${index}`}
+                  label={trade}
+                  size="small"
+                  sx={{
+                    backgroundColor: "#eef2ff",
+                    color: "#4338ca",
+                    fontWeight: 600,
+                    maxWidth: "100%",
+                  }}
+                />
+              ))}
+            </Box>
+          );
+        },
       },
 
       /* ===================================================
@@ -1436,18 +1812,10 @@ export default function Customer() {
       },
 
       /* ===================================================
-         ADDRESS
+         ADDRESS (one column per field: address, area, landmark, LGA, state)
       =================================================== */
 
-      {
-        field: "address",
-        headerName: "Address",
-        width: 240,
-        sortable: true,
-        filterable: true,
-
-        valueGetter: (value, row) => row?.addressInfo?.[0]?.address || "N/A",
-      },
+      ...addressColumns,
 
       /* ===================================================
          ACTIONS
@@ -1476,7 +1844,7 @@ export default function Customer() {
         ),
       },
     ],
-    [],
+    [badge.columns],
   );
 
   /* =======================================================
@@ -1666,7 +2034,7 @@ export default function Customer() {
             Search
           </Button>
 
-          {(search || searchInput || subscriptionFilter !== "all") && (
+          {(search || searchInput || subscriptionFilter !== "all" || badge.filter !== "all") && (
             <Button variant="outlined" onClick={handleClear}>
               Clear
             </Button>
@@ -1723,6 +2091,39 @@ export default function Customer() {
           label={`No Subscription: ${allUsers.filter((user) => !user?.subscription).length}`}
           variant="outlined"
         />
+
+        <Chip
+          label={`SP Badged: ${allUsers.filter((user) => isSP(user) && isBadged(user)).length}`}
+          variant="outlined"
+          color="warning"
+        />
+      </Box>
+
+      {/* ===================================================
+          SP BADGE: filter, bulk buttons, CSV import
+      =================================================== */}
+
+      <SpBadgeToolbar badge={badge} />
+
+      {/* ===================================================
+          EXPORT ACTIONS
+      =================================================== */}
+
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "flex-end",
+          gap: 1,
+          mb: 2,
+        }}
+      >
+        <Button variant="outlined" size="small" onClick={handleExportAll}>
+          Export All
+        </Button>
+
+        <Button variant="contained" size="small" onClick={handleExportFiltered}>
+          Export Filtered
+        </Button>
       </Box>
 
       {/* ===================================================
@@ -1768,9 +2169,13 @@ export default function Customer() {
           }}
           pageSizeOptions={[10, 25, 50, 100]}
           disableRowSelectionOnClick
+          /* SP BADGE: only SP rows can be ticked */
+          checkboxSelection
+          isRowSelectable={(params) => isSP(params.row)}
+          onRowSelectionModelChange={badge.setSelection}
           autoHeight
           slots={{
-            toolbar: CustomToolbar,
+            toolbar: () => <CustomToolbar onExportAll={handleExportAll} onExportFiltered={handleExportFiltered} />,
           }}
           sx={{
             border: 0,
@@ -1845,6 +2250,12 @@ export default function Customer() {
           }}
         />
       </Box>
+
+      {/* ===================================================
+          SP BADGE: "Are you sure?" dialogs
+      =================================================== */}
+
+      <SpBadgeDialogs badge={badge} />
 
       {/* ===================================================
           USER DETAILS MODAL
@@ -1931,11 +2342,18 @@ export default function Customer() {
               >
                 {/* USER */}
 
+                <Detail label="ID" value={selectedUser.id} />
+
                 <Detail label="Name" value={selectedUser.name} />
 
                 <Detail label="Unique ID" value={selectedUser.uniq_id} />
 
                 <Detail label="Type" value={selectedUser.type} />
+
+                <Detail
+                  label="Trade"
+                  value={Array.isArray(selectedUser.trades) ? selectedUser.trades.join(", ") : selectedUser.tradeDisplay}
+                />
 
                 <Detail label="Email" value={selectedUser.email} />
 
@@ -1954,6 +2372,35 @@ export default function Customer() {
                   label="Account Status"
                   value={Number(selectedUser.active) === 1 ? "Active" : "Inactive"}
                 />
+
+                {/* SP BADGE (SP users only) */}
+
+                {isSP(selectedUser) && (
+                  <>
+                    <Detail
+                      label="SP Badge"
+                      value={isBadged(selectedUser) ? "Badged" : "Not badged"}
+                    />
+                    <Detail
+                      label="Badge Suspension"
+                      value={
+                        ["1", "true"].includes(
+                          String(selectedUser.badge_suspended ?? selectedUser.business?.badge_suspended ?? "0").toLowerCase()
+                        )
+                          ? "Suspended"
+                          : "Not suspended"
+                      }
+                    />
+                    <Detail
+                      label="Badge Start Date"
+                      value={formatDateTime(selectedUser.badge_start_date ?? selectedUser.business?.badge_start_date)}
+                    />
+                    <Detail
+                      label="Badge Expires"
+                      value={formatDateTime(selectedUser.badge_expiry_date ?? selectedUser.business?.badge_expiry_date)}
+                    />
+                  </>
+                )}
 
                 {/* BUSINESS */}
 
@@ -2020,11 +2467,36 @@ export default function Customer() {
 
                 {/* ADDRESS */}
 
-                <Detail label="Address" value={selectedUser?.addressInfo?.[0]?.address} />
+                {selectedUser?.addressList?.length ? (
+                  selectedUser.addressList.map((item, index) => {
+                    const suffix =
+                      selectedUser.addressList.length > 1 ? ` ${index + 1}` : "";
 
-                <Detail label="Latitude" value={selectedUser?.addressInfo?.[0]?.latitude} />
+                    return (
+                      <React.Fragment key={`${item.address}-${index}`}>
+                        <Detail label={`Address${suffix}`} value={item.address} />
 
-                <Detail label="Longitude" value={selectedUser?.addressInfo?.[0]?.longitude} />
+                        <Detail label={`Area${suffix}`} value={item.area} />
+
+                        <Detail label={`Landmark${suffix}`} value={item.landmark} />
+
+                        <Detail label={`LGA${suffix}`} value={item.lga} />
+
+                        <Detail label={`State${suffix}`} value={item.state} />
+
+                        {item.latitude !== null && item.latitude !== undefined && (
+                          <Detail label={`Latitude${suffix}`} value={item.latitude} />
+                        )}
+
+                        {item.longitude !== null && item.longitude !== undefined && (
+                          <Detail label={`Longitude${suffix}`} value={item.longitude} />
+                        )}
+                      </React.Fragment>
+                    );
+                  })
+                ) : (
+                  <Detail label="Address" value="N/A" />
+                )}
               </Box>
             </Box>
           )}

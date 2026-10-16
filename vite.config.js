@@ -12,6 +12,13 @@ export default defineConfig({
     }
 },
   server: {
+    proxy: {
+      '/subscription-api': {
+        target: 'https://subscriptions.sands.com.ng',
+        changeOrigin: true,
+        rewrite: (requestPath) => requestPath.replace(/^\/subscription-api/, '/api/v1'),
+      },
+    },
     allowedHosts: [
       'cube-refute-spray.ngrok-free.dev',
       'pro-master-jennet.ngrok-free.app'
